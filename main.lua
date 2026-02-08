@@ -1,26 +1,17 @@
-local player = game.Players.LocalPlayer
-local workspace = game:GetService("Workspace")
+-- 특정 이름을 가진 모든 파트를 찾아 처리하는 함수
+local targetNames = {"Part", "VIP", "VIP_PLUS"}
 
--- 1. 설정: 벽 이름과 권한 확인 (개발자님의 설정에 맞춤)
-local targetWall = workspace:FindFirstChild("Part") -- 없애려는 벽의 이름
-
--- 2. VIP 여부 확인 (게임 내 VIP 시스템 방식에 따라 수정이 필요할 수 있습니다)
--- 보통 GamePass를 사용하거나 특정 스탯을 확인합니다.
-local isVIP = player:FindFirstChild("VIP") -- 일반 VIP
-local isVIPPlus = player:FindFirstChild("VIP_PLUS") -- VIP+
-
--- 3. 벽 제거 실행
-if targetWall then
-    if isVIP or isVIPPlus then
-        -- 방법 A: 아예 삭제하기
-        targetWall:Destroy() 
-        print("VIP 확인됨: 지름길 벽을 제거했습니다.")
-        
-        -- 방법 B: (권장) 투명하게 만들고 통과 가능하게 하기 (시각적 피드백 유지)
-        -- targetWall.Transparency = 0.5 
-        -- targetWall.CanCollide = false
-    else
-        print("VIP 권한이 없습니다.")
+for _, obj in pairs(game.Workspace:GetDescendants()) do
+    for _, targetName in pairs(targetNames) do
+        if obj.Name == targetName and obj:IsA("BasePart") then
+            -- 방법 1: 아예 삭제하기 (지도로부터 사라짐)
+            obj:Destroy() 
+            
+            -- 방법 2: (삭제가 안 될 경우 대비) 투명화 및 충돌 해제
+            -- obj.Transparency = 1
+            -- obj.CanCollide = false
+        end
     end
 end
 
+print("쓰나미 브레인롯: 지정된 벽들이 제거되었습니다!")
