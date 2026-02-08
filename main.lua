@@ -1,111 +1,64 @@
--- [[ UI 및 기능 통합 스크립트 ]] --
+-- [[ 쓰나미 브레인롯 V3: 일자 벽 삭제 + 완전 무적 합본 ]] --
 
-local Library = {} -- 간단한 UI 라이브러리 구조
 local player = game.Players.LocalPlayer
-local sgui = Instance.new("ScreenGui", game.CoreGui)
-sgui.Name = "BrainrotUI"
+local char = player.Character or player.CharacterAdded:Wait()
 
--- 메인 프레임 생성
-local main = Instance.new("Frame", sgui)
-main.Size = UDim2.new(0, 220, 0, 280)
-main.Position = UDim2.new(0.5, -110, 0.5, -140)
-main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-main.BorderSizePixel = 0
-main.Active = true
-main.Draggable = true
+-- 1. 강력 갓모드 (리스폰 대응 및 체력 고정)
+local function ApplyUltimateGod(character)
+    local hum = character:WaitForChild("Humanoid", 10)
+    if hum then
+        hum.MaxHealth = math.huge
+        hum.Health = math.huge
+        hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false) -- 죽음 상태 차단
 
--- 테두리 효과 (UIStroke)
-local stroke = Instance.new("UIStroke", main)
-stroke.Color = Color3.fromRGB(170, 0, 255)
-stroke.Thickness = 2
-
--- 제목
-local title = Instance.new("TextLabel", main)
-title.Size = UDim2.new(1, 0, 0, 40)
-title.BackgroundColor3 = Color3.fromRGB(170, 0, 255)
-title.Text = "BRAINROT V1 (April Fools)"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 14
-title.Font = Enum.Font.GothamBold
-
--- 공통 버튼 생성 함수
-local function CreateButton(name, pos, callback)
-    local btn = Instance.new("TextButton", main)
-    btn.Size = UDim2.new(0, 180, 0, 40)
-    btn.Position = UDim2.new(0.5, -90, 0, pos)
-    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 12
-    
-    -- 버튼 둥글게
-    local corner = Instance.new("UICorner", btn)
-    corner.CornerRadius = UDim.new(0, 8)
-
-    btn.MouseButton1Click:Connect(callback)
-    return btn
-end
-
---- [[ 기능 구현 ]] ---
-
--- 1. 갓모드 & 무한 점프
-CreateButton("GOD MODE & SPEED", 60, function()
-    local char = player.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.MaxHealth = math.huge
-        char.Humanoid.Health = math.huge
-        char.Humanoid.WalkSpeed = 60
-        char.Humanoid.JumpPower = 100
-        
-        char.Humanoid.HealthChanged:Connect(function()
-            char.Humanoid.Health = math.huge
+        -- 데미지 입을 때마다 즉시 회복
+        hum.HealthChanged:Connect(function()
+            hum.Health = math.huge
         end)
     end
-    print("신이 되었습니다.")
-end)
+end
 
--- 2. 벽 삭제 & 맵 확장
-CreateButton("DESTROY WALLS & EXPAND", 115, function()
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            -- 벽/경계 삭제
-            if obj.Name:lower():find("wall") or obj.Name:lower():find("border") or obj.Name:lower():find("invisible") then
-                obj:Destroy()
-            -- 바닥 무한 확장
-            elseif obj.Name:lower():find("floor") or obj.Name:lower():find("ground") then
-                obj.Size = Vector3.new(20000, 5, 20000)
-                obj.Transparency = 0.5
-                obj.Color = Color3.fromRGB(math.random(0,255), 0, 255)
+player.CharacterAdded:Connect(ApplyUltimateGod)
+ApplyUltimateGod(char)
+
+-- 2. 벽 일자 삭제 및 바닥 데미지 제거 (핵심 로직)
+local function CleanMap()
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") then
+            local name = v.Name:lower()
+            
+            -- [벽 삭제] 이름에 상관없이 '벽처럼 생긴(높거나 긴)' 구조물 타겟팅
+            -- 사진 속의 VIP 벽이나 복도 벽을 크기(Size) 기준으로 판별하여 제거
+            if v.Size.Y > 5 or v.Size.X > 20 or v.Size.Z > 20 then
+                if not name:find("floor") and not name:find("base") then
+                    v:Destroy()
+                end
+            end
+
+            -- [앞으로 가도 안 죽게] 바닥이나 물의 터치 판정을 끔
+            -- 바닥에 깔린 '닿으면 죽는 스크립트'를 무력화합니다.
+            if name:find("floor") or name:find("kill") or name:find("water") or name:find("lava") then
+                v.CanTouch = false -- 터치 이벤트를 발생시키지 않음
             end
         end
     end
-end)
+    print("벽이 일자로 제거되었고, 바닥 데미지 판정이 비활성화되었습니다.")
+end
 
--- 3. 쓰나미 제거 루프 (Toggle)
-local tsunamiActive = false
-local tsunamiBtn = CreateButton("STOP TSUNAMI: OFF", 170, function()
-    tsunamiActive = not tsunamiActive
-    if tsunamiActive then
-        _G.TsunamiLoop = true
-        task.spawn(function()
-            while _G.TsunamiLoop do
-                for _, v in pairs(workspace:GetChildren()) do
-                    if v.Name:lower():find("tsunami") or v.Name:lower():find("wave") or v.Name:lower():find("water") then
-                        v:Destroy()
-                    end
-                end
-                task.wait(0.5)
+-- 3. 쓰나미 영구 제거 루프
+task.spawn(function()
+    while true do
+        for _, v in pairs(workspace:GetChildren()) do
+            local n = v.Name:lower()
+            if n:find("tsunami") or n:find("wave") or n:find("water") then
+                v:Destroy()
             end
-        end)
-        script.Parent.Text = "STOP TSUNAMI: ON"
-    else
-        _G.TsunamiLoop = false
-        script.Parent.Text = "STOP TSUNAMI: OFF"
+        end
+        task.wait(0.5)
     end
 end)
 
--- 4. 닫기 버튼
-CreateButton("CLOSE MENU", 225, function()
-    sgui:Destroy()
-end)
+-- 4. UI 및 실행
+-- (앞서 만든 UI 버튼 로직에 CleanMap() 함수를 연결하면 됩니다.)
+CleanMap() -- 스크립트 실행 시 즉시 맵 청소
+
