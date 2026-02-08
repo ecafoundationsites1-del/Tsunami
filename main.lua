@@ -1,97 +1,89 @@
--- [[ 1. 설정 ]]
+-- [[ 1. 설정 및 대상 ]]
 local player = game.Players.LocalPlayer
-local SAFE_ZONE_NAME = "UprightStableZone"
 local REMOVE_TARGETS = {"Mud", "Part", "VIP", "VIP_PLUS"}
+local SAFE_ZONE_NAME = "InfiniteSafetyZone"
 
--- [[ 2. 이전 구조물 제거 ]]
-local function clearOld()
-    local old = workspace:FindFirstChild(SAFE_ZONE_NAME)
-    if old then old:Destroy() end
-end
-
--- [[ 3. Cosmic 확장 및 벽 생성 (수직 고정) ]]
-local function rebuild()
-    local cosmic = nil
-    local bottom = nil
-
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v.Name == "Cosmic" and v:IsA("BasePart") then
-            cosmic = v
-        elseif v.Name == "Bottom" and v:IsA("BasePart") then
-            bottom = v
+-- [[ 2. VIP 룸 직접 확장 함수 ]]
+local function expandVipRoom()
+    -- 워크스페이스에서 VIP 관련 파트들을 찾습니다.
+    for _, obj in pairs(game.Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            -- 1. 바닥 확장 (이름이 Bottom인 경우)
+            if obj.Name == "Bottom" then
+                obj.Size = Vector3.new(20000, obj.Size.Y, 20000)
+                obj.CanCollide = true
+                obj.Transparency = 0.5 -- 발판 확인용
+                obj.BrickColor = BrickColor.new("Dark stone grey")
+            end
+            
+            -- 2. 벽 확장 (이름에 Wall이 들어가거나 VIP 룸의 벽으로 추정되는 파트)
+            -- 보통 VIP룸의 벽들은 "Wall"이라는 이름을 포함하거나 Bottom 주변에 있습니다.
+            if obj.Name:lower():find("wall") and (obj.Position - player.Character.HumanoidRootPart.Position).Magnitude < 500 then
+                -- 위아래로 200스터드씩 늘림 (현재 높이에서 Y축 크기 증가 및 위치 보정)
+                local currentSize = obj.Size
+                obj.Size = Vector3.new(currentSize.X, currentSize.Y + 400, currentSize.Z)
+                obj.CFrame = obj.CFrame * CFrame.new(0, 0, 0) -- 위치 고정
+                obj.CanCollide = true
+                obj.Transparency = 0.5
+            end
         end
     end
+    print("✅ VIP 룸 바닥(2만x2만) 및 벽(위아래 200) 확장 완료")
+end
 
-    -- 1. Cosmic 파트 40,000 x 40,000 확장
-    if cosmic then
-        cosmic.Size = Vector3.new(40000, 5, 40000)
-        cosmic.Anchored = true
-        cosmic.CanCollide = true
-        cosmic.Transparency = 0.5
-        print("✅ Cosmic 4만 스터드 확장 완료")
-    end
+-- [[ 3. 내 캐릭터 추적 안전 발판 (기존 기능 유지) ]]
+local function setupSafetyZone()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+    
+    -- 기존 구역 삭제
+    if workspace:FindFirstChild(SAFE_ZONE_NAME) then workspace[SAFE_ZONE_NAME]:Destroy() end
+    
+    local model = Instance.new("Model", workspace)
+    model.Name = SAFE_ZONE_NAME
+    
+    local floor = Instance.new("Part", model)
+    floor.Size = Vector3.new(2000, 2, 2000)
+    floor.Anchored = true
+    floor.CanCollide = true
+    floor.Transparency = 0.6
+    floor.BrickColor = BrickColor.new("Dark stone grey")
+    floor.Material = Enum.Material.Plastic
 
-    -- 2. 벽 생성 (Bottom 기준 왼쪽으로 10스터드 이동 및 수직 고정)
-    if bottom then
-        local model = Instance.new("Model", workspace)
-        model.Name = SAFE_ZONE_NAME
-
-        -- 벽 생성 보조 함수 (CFrame.new만 사용하여 회전값 초기화 -> 똑바로 섬)
-        local function makeVerticalWall(name, size, worldPos)
-            local w = Instance.new("Part", model)
-            w.Name = name
-            w.Size = size
-            w.CFrame = CFrame.new(worldPos) -- 회전값 없이 좌표만 설정 (수직 고정)
-            w.Anchored = true
-            w.CanCollide = true
-            w.Transparency = 0.7
-            w.BrickColor = BrickColor.new("Really blue")
-            w.Material = Enum.Material.Plastic
+    task.spawn(function()
+        local startY = root.Position.Y - 10
+        while char and char.Parent and model.Parent do
+            if root and root.Parent then
+                floor.Position = Vector3.new(root.Position.X, startY, root.Position.Z)
+            end
+            task.wait()
         end
-
-        local bp = bottom.Position
-        local bs = bottom.Size
-        local wallHeight = 1000 -- 요청하신 대로 아주 높게
-        local yPos = bp.Y + (wallHeight / 2) -- 바닥에서 위로 솟아오르게
-
-        -- [핵심] 왼쪽 방향으로 10스터드 더 이동한 위치 계산
-        -- Bottom의 X축 기준 왼쪽 끝에서 -10만큼 더 이동
-        local leftEdgeX = bp.X - (bs.X / 2) - 10 
-
-        -- 왼쪽 벽 생성 (쓰러지지 않음)
-        makeVerticalWall("LeftHugeWall", Vector3.new(5, wallHeight, bs.Z + 40), Vector3.new(leftEdgeX, yPos, bp.Z))
-        
-        -- (선택 사항) 오른쪽/뒤쪽도 대칭으로 맞추고 싶다면 아래 주석을 푸세요
-        -- makeVerticalWall("RightWall", Vector3.new(5, wallHeight, bs.Z + 40), Vector3.new(bp.X + (bs.X/2) + 10, yPos, bp.Z))
-        
-        print("✅ 벽을 왼쪽으로 10스터드 이동 및 수직 고정 완료")
-    end
+    end)
 end
 
--- [[ 4. 실행 로직 ]]
-local function run()
-    clearOld()
-    rebuild()
+-- [[ 4. 실행 및 관리 ]]
+local function runScript()
+    expandVipRoom()
+    setupSafetyZone()
 end
 
-run()
+-- 초기 실행
+runScript()
 
--- 리스폰 시 재생성
+-- 죽었을 때 다시 실행 (VIP룸 파트는 서버 파트일 경우 유지되지만, 안전을 위해 재호출)
 player.CharacterAdded:Connect(function()
     task.wait(2)
-    run()
+    runScript()
 end)
 
--- 투명화 (Cosmic, Bottom 제외)
+-- 투명화 루프
 task.spawn(function()
     while true do
         for _, obj in pairs(workspace:GetDescendants()) do
-            for _, n in pairs(REMOVE_TARGETS) do
-                if obj.Name == n and obj:IsA("BasePart") then
-                    if obj.Name ~= "Cosmic" and obj.Name ~= "Bottom" then
-                        obj.Transparency = 1
-                        obj.CanCollide = false
-                    end
+            for _, targetName in pairs(REMOVE_TARGETS) do
+                if obj.Name == targetName and obj:IsA("BasePart") and obj.Name ~= "Bottom" then
+                    obj.Transparency = 1
+                    obj.CanCollide = false
                 end
             end
         end
