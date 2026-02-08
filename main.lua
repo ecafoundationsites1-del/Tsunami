@@ -1,60 +1,62 @@
--- [[ 1. 기본 설정 ]]
+-- [[ 1. 설정: 투명화 대상 및 고속도로 이름 ]]
 local REMOVE_TARGETS = {"Mud", "Part", "VIP", "VIP_PLUS"}
-local HIGHWAY_NAME = "PerfectSafetyWay"
+local SAFE_ZONE_NAME = "InfiniteSafetyZone"
 local player = game.Players.LocalPlayer
 
--- [[ 2. 바닥 매꾸기 및 고속도로 생성 (불투명) ]]
-local function buildSolidPath()
-    local existing = workspace:FindFirstChild(HIGHWAY_NAME)
+-- [[ 2. 절대 낙사 방지 바닥 + 안전벽 생성 함수 ]]
+local function buildSuperStructure()
+    local existing = workspace:FindFirstChild(SAFE_ZONE_NAME)
     if existing then existing:Destroy() end
     
-    local roadModel = Instance.new("Model", workspace)
-    roadModel.Name = HIGHWAY_NAME
+    local model = Instance.new("Model", workspace)
+    model.Name = SAFE_ZONE_NAME
     
     local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
-    -- [거대 바닥] 기존 바닥의 구멍을 완전히 덮어버리는 넓고 긴 판자
-    local floor = Instance.new("Part", roadModel)
-    floor.Name = "SolidFloor"
-    -- 너비를 100으로 넓혀서 웬만한 구멍은 다 덮습니다. 길이는 2500으로 상점 끝까지!
-    floor.Size = Vector3.new(100, 1.2, 2500) 
-    floor.Position = root.Position - Vector3.new(0, 3.4, 0) -- 발 밑에 딱 붙게 설정
+    -- 바닥 (원본 그대로)
+    local floor = Instance.new("Part", model)
+    floor.Name = "AntiFallFloor"
+    floor.Size = Vector3.new(2000, 2, 2000)
+    floor.Position = root.Position - Vector3.new(0, 4, 0)
     floor.Anchored = true
     floor.CanCollide = true
-    floor.Transparency = 0 -- 불투명 (VIP 바닥 스타일)
+    floor.Transparency = 0.3
     floor.Material = Enum.Material.Neon
-    floor.BrickColor = BrickColor.new("Lime green") -- VIP룸 초록색
+    floor.BrickColor = BrickColor.new("Lime green")
 
-    -- [왼쪽 벽] 낙사 방지 가이드
-    local wallL = Instance.new("Part", roadModel)
-    wallL.Size = Vector3.new(1, 25, 2500)
-    wallL.Position = floor.Position + Vector3.new(50, 12, 0) -- 바닥 끝에 맞춤
-    wallL.Anchored = true
-    wallL.CanCollide = true
-    wallL.Transparency = 0
-    wallL.BrickColor = BrickColor.new("Really blue") -- VIP룸 파란벽 스타일
+    -- ✅ 안전벽만 제대로 생성 (지름길 영향 없음)
+    local function createWall(size, position)
+        local wall = Instance.new("Part", model)
+        wall.Size = size
+        wall.Position = position
+        wall.Anchored = true
+        wall.CanCollide = true
+        wall.Transparency = 0.5
+        wall.BrickColor = BrickColor.new("Really blue")
+    end
 
-    -- [오른쪽 벽]
-    local wallR = wallL:Clone()
-    wallR.Parent = roadModel
-    wallR.Position = floor.Position + Vector3.new(-50, 12, 0)
+    -- 맵 외곽 전체 봉인
+    createWall(Vector3.new(10, 100, 2000), floor.Position + Vector3.new(1005, 50, 0))   -- 오른쪽
+    createWall(Vector3.new(10, 100, 2000), floor.Position + Vector3.new(-1005, 50, 0))  -- 왼쪽
+    createWall(Vector3.new(2000, 100, 10), floor.Position + Vector3.new(0, 50, 1005))   -- 앞
+    createWall(Vector3.new(2000, 100, 10), floor.Position + Vector3.new(0, 50, -1005))  -- 뒤
 end
 
--- [[ 3. 실시간 무한 루프 (장애물 제거 및 무적) ]]
+-- [[ 3. 실시간 감시 루프 (원본 그대로) ]]
 task.spawn(function()
     while task.wait(0.2) do
-        -- 1) 쓰나미 벽 및 이벤트 벽 투명화
+        -- 특정 벽들 투명화
         for _, obj in pairs(game.Workspace:GetDescendants()) do
             for _, name in pairs(REMOVE_TARGETS) do
                 if obj.Name == name and obj:IsA("BasePart") then
-                    obj.Transparency = 1 
+                    obj.Transparency = 1
                     obj.CanCollide = false
                 end
             end
         end
         
-        -- 2) 캐릭터 무적 (쓰나미 판정 무시)
+        -- 캐릭터 무적 처리
         if player.Character then
             for _, part in pairs(player.Character:GetDescendants()) do
                 if part:IsA("BasePart") then
@@ -66,5 +68,12 @@ task.spawn(function()
 end)
 
 -- 실행
-buildSolidPath()
-print("대장님! 구멍 없는 VIP 고속도로 건설 완료했습니다.")
+buildSuperStructure()
+
+-- 리스폰 대응 (안전벽 유지)
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    buildSuperStructure()
+end)
+
+print("낙사 방지 + 안전벽 시스템 가동 완료")
