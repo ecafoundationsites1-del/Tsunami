@@ -1,55 +1,35 @@
 -- [[ 1. 설정 ]]
 local player = game.Players.LocalPlayer
 local RunService = game:GetService("RunService")
-local PUSH_DIST = 10 -- 10스터드 후퇴
 local REMOVE_TARGETS = {"Mud", "Part", "VIP", "VIP_PLUS"}
-
--- 벽들의 고정 좌표를 저장할 테이블
-local fixedWalls = {}
+local EXPAND_SIZE = 900000 -- 요청하신 90만 스터드
 
 -- [[ 2. 핵심 실행 함수 ]]
-local function forceUltimate()
+local function updateEnvironment()
     local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+    if not char then return end
 
     for _, v in pairs(workspace:GetDescendants()) do
         if v:IsA("BasePart") then
             
-            -- [A] Bottom 이름의 '벽' 처리 (높이가 있는 것)
-            if v.Name == "Bottom" and v.Size.Y > 5 then
-                -- 1. 무조건 통과하게 만듦 (매 프레임 실행)
-                v.CanCollide = false 
-                v.Material = Enum.Material.Plastic
-                v.Transparency = 0.5
+            -- [핵심 1] 이름이 Bottom이면 무조건 삭제
+            if v.Name == "Bottom" then
+                v:Destroy()
+            
+            -- [핵심 2] Cosmic 파트 90만 x 90만 확장 (위아래 높이는 유지)
+            elseif v.Name == "Cosmic" then
+                -- 매 프레임마다 크기를 강제로 90만으로 고정
+                v.Size = Vector3.new(EXPAND_SIZE, v.Size.Y, EXPAND_SIZE)
                 v.Anchored = true
-
-                -- 2. 좌표가 계산되지 않았다면 10칸 뒤 위치 계산
-                if not fixedWalls[v] then
-                    local diff = (v.Position - root.Position) * Vector3.new(1, 0, 1)
-                    if diff.Magnitude > 0 then
-                        local pushDir = diff.Unit
-                        fixedWalls[v] = v.CFrame + (pushDir * PUSH_DIST)
-                    end
-                end
-
-                -- 3. 위치 강제 박제
-                if fixedWalls[v] then
-                    v.CFrame = fixedWalls[v]
-                end
-
-            -- [B] 진짜 바닥 확장 (발판은 통과되면 안 되므로 CanCollide = true)
-            elseif v.Name == "Cosmic" or (v.Name == "Bottom" and v.Size.Y <= 5) then
-                if v.Size.X < 20000 then
-                    v.Size = Vector3.new(9990000, v.Size.Y, 9990000)
-                    v.Anchored = true
-                end
-                v.CanCollide = true -- 바닥은 밟아야 하니까요!
+                v.CanCollide = true
+                v.Transparency = 0.5
+                -- 위치가 맵 중앙에서 벗어나지 않도록 설정 (필요 시)
+                -- v.CFrame = CFrame.new(v.Position.X, v.Position.Y, v.Position.Z)
             end
             
-            -- [C] 기타 장애물 (Mud 등) 무조건 투명 + 통과
+            -- [3] 기타 제거 대상 처리 (Mud 등)
             for _, targetName in pairs(REMOVE_TARGETS) do
-                if v.Name == targetName and v.Name ~= "Bottom" and v.Name ~= "Cosmic" then
+                if v.Name == targetName and v.Name ~= "Cosmic" then
                     v.Transparency = 1
                     v.CanCollide = false
                 end
@@ -58,13 +38,14 @@ local function forceUltimate()
     end
 end
 
--- [[ 3. 무한 루프 고정 (0.01초 간격) ]]
-RunService.Heartbeat:Connect(forceUltimate)
+-- [[ 3. 무한 감시 및 강제 실행 ]]
+-- Heartbeat를 사용하여 게임이 크기를 되돌리거나 Bottom을 생성할 틈을 주지 않음
+RunService.Heartbeat:Connect(updateEnvironment)
 
--- 리스폰 시 초기화
+-- 리스폰 시 대응
 player.CharacterAdded:Connect(function()
-    fixedWalls = {}
     task.wait(1)
+    updateEnvironment()
 end)
 
-print("✅ 통과 기능(NoClip) 및 10칸 후퇴 통합 완료!")
+print("🚀 스크립트 가동: Bottom 삭제 및 Cosmic 90만 확장 완료!")
