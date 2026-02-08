@@ -1,89 +1,90 @@
--- [[ 1. 설정 및 대상 ]]
+-- [[ 1. 설정 ]]
 local player = game.Players.LocalPlayer
+local SAFE_ZONE_NAME = "AccessibleVipZone"
 local REMOVE_TARGETS = {"Mud", "Part", "VIP", "VIP_PLUS"}
-local SAFE_ZONE_NAME = "InfiniteSafetyZone"
 
--- [[ 2. VIP 룸 직접 확장 함수 ]]
-local function expandVipRoom()
-    -- 워크스페이스에서 VIP 관련 파트들을 찾습니다.
-    for _, obj in pairs(game.Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            -- 1. 바닥 확장 (이름이 Bottom인 경우)
-            if obj.Name == "Bottom" then
-                obj.Size = Vector3.new(20000, obj.Size.Y, 20000)
-                obj.CanCollide = true
-                obj.Transparency = 0.5 -- 발판 확인용
-                obj.BrickColor = BrickColor.new("Dark stone grey")
-            end
-            
-            -- 2. 벽 확장 (이름에 Wall이 들어가거나 VIP 룸의 벽으로 추정되는 파트)
-            -- 보통 VIP룸의 벽들은 "Wall"이라는 이름을 포함하거나 Bottom 주변에 있습니다.
-            if obj.Name:lower():find("wall") and (obj.Position - player.Character.HumanoidRootPart.Position).Magnitude < 500 then
-                -- 위아래로 200스터드씩 늘림 (현재 높이에서 Y축 크기 증가 및 위치 보정)
-                local currentSize = obj.Size
-                obj.Size = Vector3.new(currentSize.X, currentSize.Y + 400, currentSize.Z)
-                obj.CFrame = obj.CFrame * CFrame.new(0, 0, 0) -- 위치 고정
-                obj.CanCollide = true
-                obj.Transparency = 0.5
-            end
+-- [[ 2. 기존 구조물 제거 ]]
+local function clearOld()
+    local old = workspace:FindFirstChild(SAFE_ZONE_NAME)
+    if old then old:Destroy() end
+end
+
+-- [[ 3. VIP 구역 재건축 (진입 가능 버전) ]]
+local function buildVipZone()
+    local bottom = nil
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v.Name == "Bottom" and v:IsA("BasePart") then
+            bottom = v
+            break
         end
     end
-    print("✅ VIP 룸 바닥(2만x2만) 및 벽(위아래 200) 확장 완료")
-end
 
--- [[ 3. 내 캐릭터 추적 안전 발판 (기존 기능 유지) ]]
-local function setupSafetyZone()
-    local char = player.Character or player.CharacterAdded:Wait()
-    local root = char:WaitForChild("HumanoidRootPart")
-    
-    -- 기존 구역 삭제
-    if workspace:FindFirstChild(SAFE_ZONE_NAME) then workspace[SAFE_ZONE_NAME]:Destroy() end
-    
+    if not bottom then return end
+
     local model = Instance.new("Model", workspace)
     model.Name = SAFE_ZONE_NAME
-    
+
+    -- [바닥] 20,000 x 20,000 거대 바닥
     local floor = Instance.new("Part", model)
-    floor.Size = Vector3.new(2000, 2, 2000)
+    floor.Size = Vector3.new(20000, 2, 20000)
+    floor.CFrame = bottom.CFrame * CFrame.new(0, -0.1, 0) -- 원래 바닥보다 살짝 아래
     floor.Anchored = true
     floor.CanCollide = true
-    floor.Transparency = 0.6
+    floor.Transparency = 0.5
     floor.BrickColor = BrickColor.new("Dark stone grey")
-    floor.Material = Enum.Material.Plastic
 
-    task.spawn(function()
-        local startY = root.Position.Y - 10
-        while char and char.Parent and model.Parent do
-            if root and root.Parent then
-                floor.Position = Vector3.new(root.Position.X, startY, root.Position.Z)
-            end
-            task.wait()
-        end
-    end)
+    -- [벽 생성 함수] - 핵심: CanCollide를 false로 하거나 특정 조건 부여
+    local function makeWall(name, size, offset)
+        local w = Instance.new("Part", model)
+        w.Name = name
+        w.Size = size
+        w.CFrame = bottom.CFrame * offset
+        w.Anchored = true
+        
+        -- [[ 진입 해결책 ]]
+        -- 벽은 보이되(Transparency 0.8), 캐릭터는 통과할 수 있게(CanCollide false) 설정
+        -- 만약 물리적으로 막고 싶다면 이 값을 true로 하고 위치를 더 멀리 잡아야 합니다.
+        w.CanCollide = false 
+        
+        w.Transparency = 0.8
+        w.BrickColor = BrickColor.new("Really blue")
+        w.Material = Enum.Material.Plastic
+    end
+
+    -- 벽의 위치를 VIP 구역에서 훨씬 멀리(5000 스터드) 배치하여 시야 방해 최소화
+    local wallDistance = 5000 
+    local wallHeight = 1000 -- 위아래로 충분히 길게
+
+    makeBigWall = makeWall -- 별칭
+    makeBigWall("F", Vector3.new(10000, wallHeight, 20), CFrame.new(0, wallHeight/2, wallDistance))
+    makeBigWall("B", Vector3.new(10000, wallHeight, 20), CFrame.new(0, wallHeight/2, -wallDistance))
+    makeBigWall("L", Vector3.new(20, wallHeight, 10000), CFrame.new(-wallDistance, wallHeight/2, 0))
+    makeBigWall("R", Vector3.new(20, wallHeight, 10000), CFrame.new(wallDistance, wallHeight/2, 0))
 end
 
--- [[ 4. 실행 및 관리 ]]
-local function runScript()
-    expandVipRoom()
-    setupSafetyZone()
+-- [[ 4. 실행 및 리스폰 관리 ]]
+local function run()
+    clearOld()
+    buildVipZone()
 end
 
--- 초기 실행
-runScript()
-
--- 죽었을 때 다시 실행 (VIP룸 파트는 서버 파트일 경우 유지되지만, 안전을 위해 재호출)
+run()
 player.CharacterAdded:Connect(function()
     task.wait(2)
-    runScript()
+    run()
 end)
 
--- 투명화 루프
+-- [[ 5. 실시간 투명화 및 충돌 관리 ]]
 task.spawn(function()
     while true do
         for _, obj in pairs(workspace:GetDescendants()) do
-            for _, targetName in pairs(REMOVE_TARGETS) do
-                if obj.Name == targetName and obj:IsA("BasePart") and obj.Name ~= "Bottom" then
-                    obj.Transparency = 1
-                    obj.CanCollide = false
+            -- VIP 관련 파트 투명화 (단, 우리가 만든 구조물은 제외)
+            for _, n in pairs(REMOVE_TARGETS) do
+                if obj.Name == n and obj:IsA("BasePart") and obj.Name ~= "Bottom" then
+                    if not obj:IsDescendantOf(workspace:FindFirstChild(SAFE_ZONE_NAME)) then
+                        obj.Transparency = 1
+                        obj.CanCollide = false
+                    end
                 end
             end
         end
