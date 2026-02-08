@@ -1,14 +1,21 @@
-
--- [[ 1. 설정: 대상 및 이름 ]]
+-- [[ 1. 설정 ]]
 local REMOVE_TARGETS = {"Mud", "Part", "VIP", "VIP_PLUS"}
 local SAFE_ZONE_NAME = "InfiniteSafetyZone"
 local HUGE_WALL_NAME = "VipLeftHugeWall"
 local player = game.Players.LocalPlayer
 
--- [[ 2. VIP Bottom 기준 거대 벽 생성 함수 ]]
+-- [[ 2. 구조물 정리 함수 (깔끔하게 삭제) ]]
+local function clearOldStructures()
+    local existingZone = workspace:FindFirstChild(SAFE_ZONE_NAME)
+    if existingZone then existingZone:Destroy() end
+    
+    local existingWall = workspace:FindFirstChild(HUGE_WALL_NAME)
+    if existingWall then existingWall:Destroy() end
+end
+
+-- [[ 3. VIP Bottom 기준 거대 벽 생성 ]]
 local function buildVipWall()
     local bottomPart = nil
-    -- 워크스페이스에서 이름이 "Bottom"인 파트 검색
     for _, obj in pairs(game.Workspace:GetDescendants()) do
         if obj.Name == "Bottom" and obj:IsA("BasePart") then
             bottomPart = obj
@@ -17,119 +24,83 @@ local function buildVipWall()
     end
 
     if bottomPart then
-        local existingWall = workspace:FindFirstChild(HUGE_WALL_NAME)
-        if existingWall then existingWall:Destroy() end
-
         local wall = Instance.new("Part")
         wall.Name = HUGE_WALL_NAME
+        wall.Size = Vector3.new(5, 1000, 40000) -- 길이를 더 늘림
         
-        -- 벽 크기 설정 (두께 5, 높이 1000, 길이 20000으로 끝까지 연장)
-        local thickness = 5
-        local height = 1000
-        local length = 20000 
-        wall.Size = Vector3.new(thickness, height, length)
-        
-        -- Bottom 파트의 왼쪽 위치 계산 (CFrame 활용)
-        local leftOffset = -(bottomPart.Size.X / 2) - (thickness / 2)
-        wall.CFrame = bottomPart.CFrame * CFrame.new(leftOffset, (height/2) - (bottomPart.Size.Y/2), 0)
+        -- CFrame을 사용하여 Bottom의 월드 좌표 기준으로 왼쪽 배치
+        local leftOffset = -(bottomPart.Size.X / 2) - 2.5
+        wall.CFrame = bottomPart.CFrame * CFrame.new(leftOffset, 500, 0)
         
         wall.Anchored = true
         wall.CanCollide = true
-        wall.Transparency = 0
+        wall.Transparency = 0.5
         wall.BrickColor = BrickColor.new("Really black")
-        wall.Material = Enum.Material.Plastic
         wall.Parent = workspace
-        print("✅ VIP Bottom 왼쪽 거대 벽 생성 완료")
-    else
-        warn("⚠️ Bottom 파트를 찾을 수 없어 벽을 세우지 못했습니다.")
     end
 end
 
--- [[ 3. 내 캐릭터 추적 안전 구조물 함수 ]]
+-- [[ 4. 내 캐릭터 추적 안전 구조물 ]]
 local function buildSuperStructure()
-    local existing = workspace:FindFirstChild(SAFE_ZONE_NAME)
-    if existing then existing:Destroy() end
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
     
     local model = Instance.new("Model", workspace)
     model.Name = SAFE_ZONE_NAME
     
-    local char = player.Character or player.CharacterAdded:Wait()
-    local root = char:WaitForChild("HumanoidRootPart")
-    local startY = root.Position.Y - 10
-
+    -- 바닥
     local floor = Instance.new("Part", model)
-    floor.Name = "AntiFallFloor"
     floor.Size = Vector3.new(2000, 2, 2000)
     floor.Anchored = true
     floor.CanCollide = true
     floor.Transparency = 0.5
-    floor.Material = Enum.Material.Plastic
     floor.BrickColor = BrickColor.new("Dark stone grey")
 
+    -- 벽 생성 도우미
     local function createWall(name, size)
-        local wall = Instance.new("Part", model)
-        wall.Name = name
-        wall.Size = size
-        wall.Anchored = true
-        wall.CanCollide = true
-        wall.Transparency = 0.7
-        wall.BrickColor = BrickColor.new("Really blue")
-        wall.Material = Enum.Material.Plastic
-        return wall
+        local w = Instance.new("Part", model)
+        w.Name = name
+        w.Size = size
+        w.Anchored = true
+        w.CanCollide = true
+        w.Transparency = 0.8
+        w.BrickColor = BrickColor.new("Really blue")
+        return w
     end
 
-    local wallR = createWall("WallRight", Vector3.new(10, 500, 2000))
-    local wallL = createWall("WallLeft", Vector3.new(10, 500, 2000))
-    local wallF = createWall("WallFront", Vector3.new(2000, 500, 10))
-    local wallB = createWall("WallBack", Vector3.new(2000, 500, 10))
+    local wallR = createWall("WR", Vector3.new(10, 500, 2000))
+    local wallL = createWall("WL", Vector3.new(10, 500, 2000))
+    local wallF = createWall("WF", Vector3.new(2000, 500, 10))
+    local wallB = createWall("WB", Vector3.new(2000, 500, 10))
 
+    -- 루프 추적 (캐릭터가 죽으면 자동 종료되도록 조건 설정)
     task.spawn(function()
-        while model.Parent do
-            local currentRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-            if currentRoot then
-                local p = currentRoot.Position
-                floor.Position = Vector3.new(p.X, startY, p.Z)
-                wallR.Position = Vector3.new(p.X + 1005, startY + 245, p.Z)
-                wallL.Position = Vector3.new(p.X - 1005, startY + 245, p.Z)
-                wallF.Position = Vector3.new(p.X, startY + 245, p.Z + 1005)
-                wallB.Position = Vector3.new(p.X, startY + 245, p.Z - 1005)
-            end
+        local startY = root.Position.Y - 10
+        while char and char.Parent and model.Parent do
+            local p = root.Position
+            floor.Position = Vector3.new(p.X, startY, p.Z)
+            wallR.Position = Vector3.new(p.X + 1005, startY + 245, p.Z)
+            wallL.Position = Vector3.new(p.X - 1005, startY + 245, p.Z)
+            wallF.Position = Vector3.new(p.X, startY + 245, p.Z + 1005)
+            wallB.Position = Vector3.new(p.X, startY + 245, p.Z - 1005)
             task.wait()
         end
     end)
 end
 
--- [[ 4. 실시간 감시 및 초기화 루프 ]]
-task.spawn(function()
-    while task.wait(0.5) do
-        -- 투명화 및 충돌 방지 로직
-        for _, obj in pairs(game.Workspace:GetDescendants()) do
-            for _, name in pairs(REMOVE_TARGETS) do
-                if obj.Name == name and obj:IsA("BasePart") then
-                    obj.Transparency = 1
-                    obj.CanCollide = false
-                end
-            end
-        end
-        
-        -- 내 캐릭터 터치 방지
-        if player.Character then
-            for _, part in pairs(player.Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanTouch = false
-                end
-            end
-        end
-    end
-end)
-
--- 실행부
-buildVipWall()      -- VIP 벽 생성
-buildSuperStructure() -- 추적 바닥 생성
-
--- 리스폰 시 재생성
-player.CharacterAdded:Connect(function()
-    task.wait(1)
+-- [[ 5. 실행 및 리스폰 관리 ]]
+local function initialize()
+    clearOldStructures()
     buildVipWall()
     buildSuperStructure()
+end
+
+-- 최초 실행
+initialize()
+
+-- 캐릭터가 바뀔 때마다(죽었을 때) 다시 실행
+player.CharacterAdded:Connect(function()
+    task.wait(1) -- 로딩 대기
+    initialize()
 end)
+
