@@ -1,19 +1,19 @@
--- [[ BRAINROT V13 FINAL: 길 가이드 + Hitbox 삭제 + 절대 불멸 ]] --
+-- [[ BRAINROT V15: 전면 개조 - 모든 킬 판정 삭제 & 빨간 구역 청소 ]] --
 
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 local MainFrame = Instance.new("Frame", ScreenGui)
 local player = game.Players.LocalPlayer
 local runService = game:GetService("RunService")
 
--- [UI 디자인]
+-- [UI 디자인 - 데인저 레드 테마]
 MainFrame.Size = UDim2.new(0, 230, 0, 350)
-MainFrame.Position = UDim2.new(0.5, -115, 0.5, -175)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.Position = UDim2.new(0.5, -115, 0.5, -165)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 0, 0)
 MainFrame.Active = true
 MainFrame.Draggable = true
 local UIStroke = Instance.new("UIStroke", MainFrame)
-UIStroke.Color = Color3.fromRGB(0, 255, 100)
-UIStroke.Thickness = 3
+UIStroke.Color = Color3.fromRGB(255, 0, 0)
+UIStroke.Thickness = 4
 Instance.new("UICorner", MainFrame)
 
 local function CreateButton(name, yPos, color, callback)
@@ -24,57 +24,71 @@ local function CreateButton(name, yPos, color, callback)
     btn.Text = name
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
     btn.MouseButton1Click:Connect(callback)
     Instance.new("UICorner", btn)
 end
 
--- 1. [절대 불멸 + Hitbox 즉시 삭제]
-CreateButton("ERASE HITBOX & GOD", 65, Color3.fromRGB(200, 0, 50), function()
-    local function UltraImmortal(char)
-        local hum = char:WaitForChild("Humanoid")
-        hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-        runService.Stepped:Connect(function()
-            hum.MaxHealth = math.huge
-            hum.Health = math.huge
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("BasePart") and v.Name:lower():find("hitbox") then
+-- 1. [게임 파일 전수 조사 및 킬 판정 완전 삭제]
+CreateButton("NUKE ALL KILL SCRIPTS", 65, Color3.fromRGB(150, 0, 0), function()
+    local function PurgeKillElements()
+        for _, v in pairs(workspace:GetDescendants()) do
+            local name = v.Name:lower()
+            -- Hitbox, Kill, Damage, Lava, Dead 등 위험 단어 포함된 모든 것 삭제
+            if name:find("hitbox") or name:find("kill") or name:find("damage") or name:find("lava") then
+                if v:IsA("BasePart") then
+                    v.CanTouch = false
+                    v.CanQuery = false
+                    v:Destroy()
+                elseif v:IsA("Script") or v:IsA("LocalScript") then
+                    v.Disabled = true
                     v:Destroy()
                 end
             end
+        end
+    end
+    
+    -- 즉시 실행 및 실시간 감시 (새로 생성되는 킬 파트 방지)
+    runService.Stepped:Connect(PurgeKillElements)
+    
+    -- 캐릭터 불멸 상태 고정
+    local function Immortal(char)
+        local hum = char:WaitForChild("Humanoid")
+        hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+        runService.Heartbeat:Connect(function()
+            hum.MaxHealth = 9e9
+            hum.Health = 9e9
         end)
     end
-    if player.Character then UltraImmortal(player.Character) end
-    player.CharacterAdded:Connect(UltraImmortal)
+    if player.Character then Immortal(player.Character) end
+    player.CharacterAdded:Connect(Immortal)
+    print("모든 킬 판정 및 스크립트가 영구 삭제되었습니다.")
 end)
 
--- 2. [맵 정리 및 중앙 길 가이드]
--- 앞이 안 보이는 문제를 해결하기 위해 중앙 도로만 색을 칠합니다.
-CreateButton("FIX VIEW & HIGHWAY", 125, Color3.fromRGB(0, 150, 100), function()
+-- 2. [빨간 선 안쪽 VIP/옆벽 전면 삭제]
+CreateButton("ERASE RED ZONE (INSIDE)", 125, Color3.fromRGB(200, 50, 0), function()
     for _, v in pairs(workspace:GetDescendants()) do
         if v:IsA("BasePart") then
             local n = v.Name:lower()
-            -- 중앙 바닥 판별
-            if n:find("floor") or v.Position.Y < (player.Character.HumanoidRootPart.Position.Y - 1) then
-                v.CanTouch = false
-                v.Size = Vector3.new(v.Size.X, v.Size.Y, 500000) -- 길이는 무한
-                -- [수정] 중앙 길은 진한 검정색, 옆 확장 구역은 투명하게 하여 앞이 보이게 함
-                if math.abs(v.Position.X) < 50 then
-                    v.Color = Color3.fromRGB(30, 30, 30) -- 중앙 고속도로 (보임)
-                    v.Transparency = 0
-                else
-                    v.Transparency = 0.8 -- 옆 공간 (멀리 보임)
+            -- 바닥(Floor) 계열이 아니면서 옆을 막는 모든 구조물 삭제
+            if not n:find("floor") and not n:find("base") then
+                if n:find("vip") or n:find("wall") or n:find("border") or n:find("gate") or n:find("obstacle") then
+                    v:Destroy()
                 end
-            -- VIP 옆벽 및 정신 사나운 벽들만 골라서 삭제
-            elseif v.Size.Y > 2 and (n:find("wall") or n:find("vip") or n:find("border")) then
-                v:Destroy()
+            end
+            -- 바닥은 무한 확장하여 안전지대 확보
+            if n:find("floor") or v.Position.Y < (player.Character.HumanoidRootPart.Position.Y - 1) then
+                v.Size = Vector3.new(10000, v.Size.Y, 1000000)
+                v.CanTouch = false
+                v.Transparency = 0
             end
         end
     end
-    print("중앙 통로 가이드가 생성되었습니다. 이제 앞이 보일 거예요!")
+    print("사진 속 빨간 구역의 모든 장애물이 제거되었습니다.")
 end)
 
--- 3. [쓰나미 79% 투명화]
-CreateButton("GHOST TSUNAMI (79%)", 185, Color3.fromRGB(100, 0, 200), function()
+-- 3. [쓰나미 고스트화 (79% 투명도)]
+CreateButton("GHOST TSUNAMI (79%)", 185, Color3.fromRGB(100, 0, 150), function()
     task.spawn(function()
         while true do
             for _, v in pairs(workspace:GetDescendants()) do
@@ -91,5 +105,5 @@ CreateButton("GHOST TSUNAMI (79%)", 185, Color3.fromRGB(100, 0, 200), function()
     end)
 end)
 
-CreateButton("CLOSE MENU", 260, Color3.fromRGB(50, 50, 50), function() ScreenGui:Destroy() end)
+CreateButton("CLOSE MENU", 260, Color3.fromRGB(40, 40, 40), function() ScreenGui:Destroy() end)
 
