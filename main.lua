@@ -1,51 +1,26 @@
--- [[ 1. 설정 ]]
-local player = game.Players.LocalPlayer
-local RunService = game:GetService("RunService")
-local REMOVE_TARGETS = {"Mud", "Part", "VIP", "VIP_PLUS"}
-local EXPAND_SIZE = 900000 -- 요청하신 90만 스터드
+-- 쓰나미 브레인롯 개발자용 정리 스크립트
+local workspace = game.Workspace
 
--- [[ 2. 핵심 실행 함수 ]]
-local function updateEnvironment()
-    local char = player.Character
-    if not char then return end
+for _, obj in pairs(workspace:GetDescendants()) do
+    -- 1. "VIP"가 이름에 포함된 파트 충돌 끄기
+    if obj:IsA("BasePart") and string.find(obj.Name, "VIP") then
+        obj.CanCollide = false
+        -- 확인용 (선택 사항)
+        obj.Transparency = 0.5 
+    end
 
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v:IsA("BasePart") then
-            
-            -- [핵심 1] 이름이 Bottom이면 무조건 삭제
-            if v.Name == "Bottom" then
-                v:Destroy()
-            
-            -- [핵심 2] Cosmic 파트 90만 x 90만 확장 (위아래 높이는 유지)
-            elseif v.Name == "Cosmic" then
-                -- 매 프레임마다 크기를 강제로 90만으로 고정
-                v.Size = Vector3.new(EXPAND_SIZE, v.Size.Y, EXPAND_SIZE)
-                v.Anchored = true
-                v.CanCollide = true
-                v.Transparency = 0.5
-                -- 위치가 맵 중앙에서 벗어나지 않도록 설정 (필요 시)
-                -- v.CFrame = CFrame.new(v.Position.X, v.Position.Y, v.Position.Z)
-            end
-            
-            -- [3] 기타 제거 대상 처리 (Mud 등)
-            for _, targetName in pairs(REMOVE_TARGETS) do
-                if v.Name == targetName and v.Name ~= "Cosmic" then
-                    v.Transparency = 1
-                    v.CanCollide = false
-                end
-            end
-        end
+    -- 2. "Wall" (벽), "Part" (VIP 제외), "Mud" 이름인 개체 삭제
+    -- 주의: VIP 파트는 위에서 처리했으므로 삭제 대상에서 제외했습니다.
+    if obj.Name == "Wall" or (obj.Name == "Part" and not string.find(obj.Name, "VIP")) or obj.Name == "Mud" then
+        obj:Destroy()
+    end
+
+    -- 3. "Cosmic"과 "rare" 파트 확장 (900,000 x 900,000)
+    if obj:IsA("BasePart") and (obj.Name == "Cosmic" or obj.Name == "rare") then
+        obj.Size = Vector3.new(900000, obj.Size.Y, 900000)
+        -- 너무 커서 위치가 틀어질 수 있으니 중심 고정
+        obj.Anchored = true 
     end
 end
 
--- [[ 3. 무한 감시 및 강제 실행 ]]
--- Heartbeat를 사용하여 게임이 크기를 되돌리거나 Bottom을 생성할 틈을 주지 않음
-RunService.Heartbeat:Connect(updateEnvironment)
-
--- 리스폰 시 대응
-player.CharacterAdded:Connect(function()
-    task.wait(1)
-    updateEnvironment()
-end)
-
-print("🚀 스크립트 가동: Bottom 삭제 및 Cosmic 90만 확장 완료!")
+print("정리 완료! 벽과 진흙은 사라졌고, 우주는 넓어졌습니다.")
