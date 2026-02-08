@@ -1,110 +1,76 @@
 -- [[ 1. 설정 ]]
 local player = game.Players.LocalPlayer
+local MOVE_STUDS = 10 -- 스터드 10칸 후퇴
+local SAFE_ZONE_NAME = "UprightStableZone"
 local REMOVE_TARGETS = {"Mud", "Part", "VIP", "VIP_PLUS"}
-local SAFE_ZONE_NAME = "InfiniteSafetyZone"
 
--- [[ 2. VIP 룸 처리 (벽 제거 + 바닥 확장) ]]
-local function expandVipRoom()
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-
-            -- 🔥 벽 전부 제거
-            if obj.Name:lower():find("wall") then
-                obj:Destroy()
-            end
-
-            -- 🔥 VIP 바닥 확장 (위로 말고 X/Z만)
-            if obj.Name == "Bottom" then
-                obj.Size = Vector3.new(40000, obj.Size.Y, 40000)
-                -- 중심 유지 → 앞/뒤/왼/오른쪽으로만 확장됨
-                obj.Anchored = true
-                obj.CanCollide = true
-                obj.Transparency = 0.5
-                obj.Color = Color3.fromRGB(99, 95, 98)
-            end
-        end
-    end
-
-    print("✅ 벽 제거 + VIP 바닥 40000x40000 확장 완료")
-end
-
--- [[ 3. 캐릭터 추적 안전 발판 ]]
-local function setupSafetyZone()
-    local char = player.Character or player.CharacterAdded:Wait()
-    local root = char:WaitForChild("HumanoidRootPart")
-
-    if workspace:FindFirstChild(SAFE_ZONE_NAME) then
-        workspace[SAFE_ZONE_NAME]:Destroy()
-    end
-
-    local model = Instance.new("Model", workspace)
-    model.Name = SAFE_ZONE_NAME
-
-    local floor = Instance.new("Part", model)
-    floor.Size = Vector3.new(2000, 2, 2000)
-    floor.Anchored = true
-    floor.CanCollide = true
-    floor.Transparency = 0.6
-    floor.Color = Color3.fromRGB(99, 95, 98)
-
-    task.spawn(function()
-        while root and root.Parent do
-            floor.Position = root.Position - Vector3.new(0, 6, 0)
-            task.wait()
-        end
-    end)
-end
-
--- [[ 4. 실행 ]]
-local function runScript()
-    expandVipRoom()
-    setupSafetyZone()
-end
-
-runScript()
-
-player.CharacterAdded:Connect(function()
-    task.wait(2)
-    runScript()
-end)
-
--- [[ 5. 장애물 투명화 ]]
-task.spawn(function()
-    while true do
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") then
-                for _, name in pairs(REMOVE_TARGETS) do
-                    if obj.Name:find(name)
-                    and obj.Name ~= "Bottom"
-                    and not obj.Name:lower():find("wall") then
-                        obj.Transparency = 1
-                        obj.CanCollide = false
-                    end
+-- [[ 2. 환경 재구축 함수 ]]
+local function rebuild()
+    local char = player.Character
+    if not char then return end
+    
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") then
+            -- [1] Cosmic 및 진짜 바닥 확장
+            if v.Name == "Cosmic" or (v.Name == "Bottom" and v.Size.Y <= 10) then
+                v.Size = Vector3.new(40000, v.Size.Y, 40000)
+                v.Anchored = true
+                v.CanCollide = true
+                if v.Name == "Cosmic" then v.Transparency = 0.5 end
+            
+            -- [2] Bottom 이름의 '벽' 처리
+            elseif v.Name == "Bottom" and v.Size.Y > 10 then
+                -- 이미 처리된 벽은 건너뜀 (무한 이동 방지)
+                if not v:FindFirstChild("Fixed") then
+                    v.Material = Enum.Material.Plastic -- 재질 플라스틱으로 변경
+                    v.Transparency = 0.5
+                    v.Anchored = true
+                    
+                    -- [핵심] 벽이 바라보는 방향의 뒤쪽으로 10스터드 이동
+                    -- CFrame.new(0, 0, MOVE_STUDS)는 로컬 좌표 기준 뒤쪽을 의미함
+                    v.CFrame = v.CFrame * CFrame.new(0, 0, MOVE_STUDS)
+                    
+                    -- 처리 완료 태그 생성
+                    local tag = Instance.new("BoolValue", v)
+                    tag.Name = "Fixed"
+                    
+                    -- 벽 높이 대폭 확장 (위로 솟구치게)
+                    v.Size = Vector3.new(v.Size.X, 1000, v.Size.Z)
                 end
             end
         end
-        task.wait(1)
     end
-end)
-local player = game.Players.LocalPlayer
+end
 
-local function resizeCosmic()
+-- [[ 3. 장애물 제거 함수 ]]
+local function clearObstacles()
     for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name == "Cosmic" then
-            obj.Size = Vector3.new(40000, obj.Size.Y, 40000)
-            obj.Anchored = true
-            obj.CanCollide = true
+        for _, n in pairs(REMOVE_TARGETS) do
+            if obj.Name == n and obj:IsA("BasePart") then
+                -- 바닥이나 이미 처리된 벽은 제외
+                if obj.Name ~= "Cosmic" and not obj:FindFirstChild("Fixed") and obj.Size.Y <= 10 then
+                    obj.Transparency = 1
+                    obj.CanCollide = false
+                end
+            end
         end
     end
 end
 
--- 처음 실행
-resizeCosmic()
-
--- 리스폰 시 재적용
-player.CharacterAdded:Connect(function()
-    task.wait(1)
-    resizeCosmic()
+-- [[ 4. 메인 실행 루프 ]]
+task.spawn(function()
+    while true do
+        rebuild()
+        clearObstacles()
+        task.wait(3) -- 3초마다 새로 생기는 구조물 체크
+    end
 end)
 
-print("✅ Cosmic 파트 40000×40000 적용 완료")
+-- 초기 실행 및 리스폰 대응
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    rebuild()
+end)
+
+rebuild()
+print("✅ 스크립트 통합 완료: 벽 10칸 후퇴 및 플라스틱 변경 적용됨")
