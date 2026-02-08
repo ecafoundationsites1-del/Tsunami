@@ -1,11 +1,10 @@
 -- [[ 1. 기본 설정 ]]
-local REMOVE_TARGETS = {"Mud", "Part", "VIP", "VIP_PLUS"} -- 투명하게 만들 벽들
-local HIGHWAY_NAME = "VipCustomHighWay"
+local REMOVE_TARGETS = {"Mud", "Part", "VIP", "VIP_PLUS"}
+local HIGHWAY_NAME = "PerfectSafetyWay"
 local player = game.Players.LocalPlayer
 
--- [[ 2. 고속도로 건설 함수 (불투명, VIP 스타일) ]]
-local function buildRoad()
-    -- 이미 길이 있다면 삭제하고 다시 생성 (위치 갱신용)
+-- [[ 2. 바닥 매꾸기 및 고속도로 생성 (불투명) ]]
+local function buildSolidPath()
     local existing = workspace:FindFirstChild(HIGHWAY_NAME)
     if existing then existing:Destroy() end
     
@@ -15,37 +14,37 @@ local function buildRoad()
     local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
-    -- [바닥] VIP 룸 바닥처럼 쨍한 네온 초록색 (불투명)
+    -- [거대 바닥] 기존 바닥의 구멍을 완전히 덮어버리는 넓고 긴 판자
     local floor = Instance.new("Part", roadModel)
-    floor.Name = "Floor"
-    floor.Size = Vector3.new(30, 1, 2000) -- 너비 30, 길이 2000 (매우 길게)
-    floor.Position = root.Position - Vector3.new(0, 3.5, 0)
+    floor.Name = "SolidFloor"
+    -- 너비를 100으로 넓혀서 웬만한 구멍은 다 덮습니다. 길이는 2500으로 상점 끝까지!
+    floor.Size = Vector3.new(100, 1.2, 2500) 
+    floor.Position = root.Position - Vector3.new(0, 3.4, 0) -- 발 밑에 딱 붙게 설정
     floor.Anchored = true
     floor.CanCollide = true
-    floor.Transparency = 0 -- 불투명
+    floor.Transparency = 0 -- 불투명 (VIP 바닥 스타일)
     floor.Material = Enum.Material.Neon
-    floor.BrickColor = BrickColor.new("Lime green") 
+    floor.BrickColor = BrickColor.new("Lime green") -- VIP룸 초록색
 
-    -- [왼쪽 벽] 상점 끝까지 이어지는 가이드 (불투명)
+    -- [왼쪽 벽] 낙사 방지 가이드
     local wallL = Instance.new("Part", roadModel)
-    wallL.Size = Vector3.new(1, 20, 2000)
-    wallL.Position = floor.Position + Vector3.new(15, 10, 0)
+    wallL.Size = Vector3.new(1, 25, 2500)
+    wallL.Position = floor.Position + Vector3.new(50, 12, 0) -- 바닥 끝에 맞춤
     wallL.Anchored = true
     wallL.CanCollide = true
     wallL.Transparency = 0
-    wallL.BrickColor = BrickColor.new("Really blue")
-    wallL.Material = Enum.Material.Glass
+    wallL.BrickColor = BrickColor.new("Really blue") -- VIP룸 파란벽 스타일
 
-    -- [오른쪽 벽] 반대편 가이드
+    -- [오른쪽 벽]
     local wallR = wallL:Clone()
     wallR.Parent = roadModel
-    wallR.Position = floor.Position + Vector3.new(-15, 10, 0)
+    wallR.Position = floor.Position + Vector3.new(-50, 12, 0)
 end
 
--- [[ 3. 실시간 무한 루프 (이벤트 대응 및 벽 투명화) ]]
+-- [[ 3. 실시간 무한 루프 (장애물 제거 및 무적) ]]
 task.spawn(function()
-    while task.wait(0.2) do -- 0.2초마다 맵 전체 스캔
-        -- 지정된 벽들 투명도 1(100%)로 만들고 통과 가능하게 설정
+    while task.wait(0.2) do
+        -- 1) 쓰나미 벽 및 이벤트 벽 투명화
         for _, obj in pairs(game.Workspace:GetDescendants()) do
             for _, name in pairs(REMOVE_TARGETS) do
                 if obj.Name == name and obj:IsA("BasePart") then
@@ -55,7 +54,7 @@ task.spawn(function()
             end
         end
         
-        -- 쓰나미 면역 (Hitbox 제거)
+        -- 2) 캐릭터 무적 (쓰나미 판정 무시)
         if player.Character then
             for _, part in pairs(player.Character:GetDescendants()) do
                 if part:IsA("BasePart") then
@@ -67,5 +66,5 @@ task.spawn(function()
 end)
 
 -- 실행
-buildRoad()
-print("VIP 고속도로 완료! 모든 장애물은 투명화되었습니다.")
+buildSolidPath()
+print("대장님! 구멍 없는 VIP 고속도로 건설 완료했습니다.")
