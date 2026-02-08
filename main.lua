@@ -2,60 +2,33 @@
 local player = game.Players.LocalPlayer
 local REMOVE_TARGETS = {"Mud", "Part", "VIP", "VIP_PLUS"}
 local SAFE_ZONE_NAME = "InfiniteSafetyZone"
-local WALL_RETREAT_DISTANCE = 10
 
--- [[ 2. VIP 룸 확장 ]]
+-- [[ 2. VIP 룸 처리 (벽 제거 + 바닥 확장) ]]
 local function expandVipRoom()
-    local char = player.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-
-    local vipBottom = nil
-
-    -- 먼저 VIP 바닥 찾기
     for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name == "Bottom" then
-            vipBottom = obj
-            obj.Size = Vector3.new(20000, obj.Size.Y, 20000)
-            obj.Anchored = true
-            obj.CanCollide = true
-            obj.Transparency = 0.5
-            obj.Color = Color3.fromRGB(99, 95, 98)
-            break
-        end
-    end
+        if obj:IsA("BasePart") then
 
-    if not vipBottom then return end
-    local center = vipBottom.Position
+            -- 🔥 벽 전부 제거
+            if obj.Name:lower():find("wall") then
+                obj:Destroy()
+            end
 
-    -- 벽 처리
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name:lower():find("wall") then
-            if (obj.Position - center).Magnitude < 600 then
-
-                -- 높이 위로 확장
-                local oldSize = obj.Size
-                obj.Size = Vector3.new(oldSize.X, oldSize.Y + 400, oldSize.Z)
-                obj.CFrame = obj.CFrame * CFrame.new(0, 200, 0)
-
-                -- 🔥 VIP 중심 기준 바깥쪽으로 10스터드
-                local dir = (obj.Position - center)
-                local flatDir = Vector3.new(dir.X, 0, dir.Z)
-
-                if flatDir.Magnitude > 0 then
-                    obj.CFrame = obj.CFrame + flatDir.Unit * WALL_RETREAT_DISTANCE
-                end
-
+            -- 🔥 VIP 바닥 확장 (위로 말고 X/Z만)
+            if obj.Name == "Bottom" then
+                obj.Size = Vector3.new(40000, obj.Size.Y, 40000)
+                -- 중심 유지 → 앞/뒤/왼/오른쪽으로만 확장됨
                 obj.Anchored = true
                 obj.CanCollide = true
                 obj.Transparency = 0.5
+                obj.Color = Color3.fromRGB(99, 95, 98)
             end
         end
     end
 
-    print("✅ VIP룸 정상 확장 완료 (입구 안 막힘)")
+    print("✅ 벽 제거 + VIP 바닥 40000x40000 확장 완료")
 end
 
--- [[ 3. 안전 발판 ]]
+-- [[ 3. 캐릭터 추적 안전 발판 ]]
 local function setupSafetyZone()
     local char = player.Character or player.CharacterAdded:Wait()
     local root = char:WaitForChild("HumanoidRootPart")
