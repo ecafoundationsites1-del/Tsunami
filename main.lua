@@ -86,3 +86,25 @@ task.spawn(function()
         task.wait(1)
     end
 end)
+local player = game.Players.LocalPlayer
+
+local function resizeCosmic()
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name == "Cosmic" then
+            obj.Size = Vector3.new(40000, obj.Size.Y, 40000)
+            obj.Anchored = true
+            obj.CanCollide = true
+        end
+    end
+end
+
+-- 처음 실행
+resizeCosmic()
+
+-- 리스폰 시 재적용
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    resizeCosmic()
+end)
+
+print("✅ Cosmic 파트 40000×40000 적용 완료")
