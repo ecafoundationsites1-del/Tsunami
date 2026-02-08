@@ -15,7 +15,7 @@ for _, obj in pairs(workspace:GetDescendants()) do
         obj:Destroy()
     end
 
-    -- 3. "Cosmic"과 "rare" 파트 확장 (900,000 x 900,000)
+    -- 3. "Cosmic"과 "Common" 파트 확장 (900,000 x 900,000)
     if obj:IsA("BasePart") and (obj.Name == "Cosmic" or obj.Name == "rare") then
         obj.Size = Vector3.new(900000, obj.Size.Y, 900000)
         -- 너무 커서 위치가 틀어질 수 있으니 중심 고정
