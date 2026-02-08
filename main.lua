@@ -23,7 +23,7 @@ local function buildSuperStructure()
     floor.Anchored = true
     floor.CanCollide = true
     floor.Transparency = 0.5
-    floor.Material = Enum.Material.Plastic -- Neon에서 Plastic으로 변경
+    floor.Material = Enum.Material.Plastic -- Plastic에서 Plastic으로 변경
     floor.BrickColor = BrickColor.new("Dark stone grey") -- 색상도 차분하게 변경
 
     -- 안전벽 생성 함수 (높이를 크게 키워 이탈 방지)
@@ -33,7 +33,7 @@ local function buildSuperStructure()
         wall.Size = size
         wall.Anchored = true
         wall.CanCollide = true
-        wall.Transparency = 0.8
+        wall.Transparency = 0
         wall.BrickColor = BrickColor.new("Really blue")
         wall.Material = Enum.Material.Plastic
         return wall
