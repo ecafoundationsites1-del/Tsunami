@@ -41,7 +41,7 @@ local function forceUltimate()
             -- [B] 진짜 바닥 확장 (발판은 통과되면 안 되므로 CanCollide = true)
             elseif v.Name == "Cosmic" or (v.Name == "Bottom" and v.Size.Y <= 5) then
                 if v.Size.X < 20000 then
-                    v.Size = Vector3.new(40000, v.Size.Y, 40000)
+                    v.Size = Vector3.new(9990000, v.Size.Y, 9990000)
                     v.Anchored = true
                 end
                 v.CanCollide = true -- 바닥은 밟아야 하니까요!
