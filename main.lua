@@ -1,54 +1,58 @@
 -- [[ 1. 설정 ]]
 local player = game.Players.LocalPlayer
-local MOVE_STUDS = 10 -- 스터드 10칸 후퇴
-local SAFE_ZONE_NAME = "UprightStableZone"
+local MOVE_STUDS = 10 -- 정확히 스터드 10칸(돌기 10개) 뒤로 후퇴
 local REMOVE_TARGETS = {"Mud", "Part", "VIP", "VIP_PLUS"}
 
--- [[ 2. 환경 재구축 함수 ]]
+-- [[ 2. 환경 재구축 (벽 밀기 + 확장) ]]
 local function rebuild()
     local char = player.Character
-    if not char then return end
-    
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
     for _, v in pairs(workspace:GetDescendants()) do
         if v:IsA("BasePart") then
-            -- [1] Cosmic 및 진짜 바닥 확장
-            if v.Name == "Cosmic" or (v.Name == "Bottom" and v.Size.Y <= 10) then
+            -- [A] Cosmic 및 진짜 바닥 확장
+            if v.Name == "Cosmic" or (v.Name == "Bottom" and v.Size.Y <= 5) then
                 v.Size = Vector3.new(40000, v.Size.Y, 40000)
                 v.Anchored = true
                 v.CanCollide = true
                 if v.Name == "Cosmic" then v.Transparency = 0.5 end
-            
-            -- [2] Bottom 이름의 '벽' 처리
-            elseif v.Name == "Bottom" and v.Size.Y > 10 then
-                -- 이미 처리된 벽은 건너뜀 (무한 이동 방지)
-                if not v:FindFirstChild("Fixed") then
-                    v.Material = Enum.Material.Plastic -- 재질 플라스틱으로 변경
+
+            -- [B] Bottom 이름의 '벽' (높이가 있는 파트) 처리
+            elseif v.Name == "Bottom" and v.Size.Y > 5 then
+                -- 한 번만 밀리도록 태그 확인
+                if not v:FindFirstChild("IsMoved") then
+                    v.Material = Enum.Material.Plastic -- 재질 변경 (스터드 제거)
                     v.Transparency = 0.5
                     v.Anchored = true
+                    v.CanCollide = false -- 통과 가능하게 설정
+
+                    -- 캐릭터 중심에서 바깥쪽 방향 계산
+                    local diff = v.Position - root.Position
+                    local direction = Vector3.new(diff.X, 0, diff.Z).Unit
                     
-                    -- [핵심] 벽이 바라보는 방향의 뒤쪽으로 10스터드 이동
-                    -- CFrame.new(0, 0, MOVE_STUDS)는 로컬 좌표 기준 뒤쪽을 의미함
-                    v.CFrame = v.CFrame * CFrame.new(0, 0, MOVE_STUDS)
+                    -- 벽이 바라보는 방향 기준으로 10스터드 뒤로 이동
+                    v.CFrame = v.CFrame + (direction * MOVE_STUDS)
                     
-                    -- 처리 완료 태그 생성
-                    local tag = Instance.new("BoolValue", v)
-                    tag.Name = "Fixed"
-                    
-                    -- 벽 높이 대폭 확장 (위로 솟구치게)
+                    -- 높이를 대폭 키워 경계 확실히 표시
                     v.Size = Vector3.new(v.Size.X, 1000, v.Size.Z)
+
+                    -- 중복 이동 방지 태그
+                    local tag = Instance.new("BoolValue", v)
+                    tag.Name = "IsMoved"
                 end
             end
         end
     end
 end
 
--- [[ 3. 장애물 제거 함수 ]]
+-- [[ 3. 장애물 제거 ]]
 local function clearObstacles()
     for _, obj in pairs(workspace:GetDescendants()) do
         for _, n in pairs(REMOVE_TARGETS) do
             if obj.Name == n and obj:IsA("BasePart") then
-                -- 바닥이나 이미 처리된 벽은 제외
-                if obj.Name ~= "Cosmic" and not obj:FindFirstChild("Fixed") and obj.Size.Y <= 10 then
+                -- 바닥이나 이미 처리된 벽 제외하고 투명화
+                if obj.Name ~= "Cosmic" and not obj:FindFirstChild("IsMoved") and obj.Size.Y <= 5 then
                     obj.Transparency = 1
                     obj.CanCollide = false
                 end
@@ -57,20 +61,20 @@ local function clearObstacles()
     end
 end
 
--- [[ 4. 메인 실행 루프 ]]
+-- [[ 4. 메인 실행 및 루프 ]]
 task.spawn(function()
     while true do
         rebuild()
         clearObstacles()
-        task.wait(3) -- 3초마다 새로 생기는 구조물 체크
+        task.wait(2) -- 2초마다 체크 (새로 생기는 벽 대응)
     end
 end)
 
--- 초기 실행 및 리스폰 대응
 player.CharacterAdded:Connect(function()
     task.wait(1)
     rebuild()
 end)
 
 rebuild()
-print("✅ 스크립트 통합 완료: 벽 10칸 후퇴 및 플라스틱 변경 적용됨")
+print("✅ 벽 10칸 후퇴 + 통과 + 플라스틱 변경 완료!")
+
