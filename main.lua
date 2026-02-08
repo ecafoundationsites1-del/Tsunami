@@ -1,25 +1,37 @@
--- [1] 벽 제거 및 VIP 통로 개방
-local targetNames = {"Part", "VIP", "VIP_PLUS"}
+-- 제거할 대상 목록
+local targetNames = {"Mud", "Part", "VIP", "VIP_PLUS"}
 
-for _, obj in pairs(game.Workspace:GetDescendants()) do
-    for _, targetName in pairs(targetNames) do
-        if obj.Name == targetName and obj:IsA("BasePart") then
-            obj.CanCollide = false -- 통과 가능
-            obj.Transparency = 0.5  -- 위치 확인을 위해 반투명하게 설정 (완전 삭제는 1)
-            -- obj:Destroy() -- 아예 없애고 싶으면 이 줄의 주석을 푸세요
+-- 1. 벽 제거 함수
+local function clearWalls()
+    for _, obj in pairs(game.Workspace:GetDescendants()) do
+        for _, name in pairs(targetNames) do
+            if obj.Name == name and obj:IsA("BasePart") then
+                obj.CanCollide = false
+                obj.Transparency = 1
+                -- obj:Destroy() -- 완전히 삭제하려면 주석 해제
+            end
         end
     end
 end
 
--- [2] 쓰나미 면역 (Hitbox 무력화)
--- 캐릭터의 터치 판정을 조절하여 쓰나미에 닿아도 죽지 않게 시도합니다.
-local player = game.Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-
-for _, part in pairs(character:GetDescendants()) do
-    if part:IsA("BasePart") then
-        part.CanTouch = false -- 쓰나미(Kill Part)와의 접촉 판정을 끔
+-- 2. 캐릭터 무적(Hitbox 무력화) 함수
+local function makeGodMode()
+    local char = game.Players.LocalPlayer.Character
+    if char then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanTouch = false
+            end
+        end
     end
 end
 
-print("스크립트 활성화: 벽 제거 및 쓰나미 면역 상태입니다.")
+-- [메인 루프] 맵 이벤트로 벽이 재생성되는 것을 방지하기 위해 1초마다 실행
+task.spawn(function()
+    while task.wait(1) do
+        clearWalls()
+        makeGodMode()
+    end
+end)
+
+print("쓰나미 브레인롯: 실시간 벽 제거 및 무적 모드 가동 중 (Mud 포함)")
